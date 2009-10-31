@@ -58,7 +58,7 @@ module Deproll
         :available_version  => latest_version,
         :source             => source,
         :lib                => lib,
-        :requirement        => requirement } 
+        :requirement        => requirement }
     end
 
     def requirement
