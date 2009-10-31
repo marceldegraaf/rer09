@@ -46,10 +46,23 @@ module Deproll
 
     include Helper
 
-    attr_reader  :version, :gemspec
+    attr_reader :gemspec
 
     def initialize(gemspec)
       @gemspec = gemspec
+    end
+
+    def to_hash
+      { :name               => name,
+        :current_version    => version,
+        :available_version  => latest_version,
+        :source             => source,
+        :lib                => lib,
+        :requirement        => requirement } 
+    end
+
+    def requirement
+      gemspec.requirement
     end
 
     def name
