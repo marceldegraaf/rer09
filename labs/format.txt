@@ -1,0 +1,9 @@
+Dependency:
+  name (string) # e.g. 'mislav-will_paginate'
+  current_version (string)
+  available_version (string)
+  source (string)
+  lib (string)
+  requirement (string) # e.g. '>= 0.2.3'
+  stage_id (integer)
+  
