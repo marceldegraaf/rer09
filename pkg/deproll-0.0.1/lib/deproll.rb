@@ -1,14 +1,45 @@
 require 'rubygems'
 require 'rubygems/command'
 require 'rubygems/commands/update_command'
-
+require 'httparty'
+ 
 module Deproll
 
   def self.scan(dir)
     $deproll_dir = dir
-    puts RailsEnvironment.new.updateable_gems
+    gems = RailsEnvironment.new.updateable_gems
+    puts gems
+    puts "Sending to Webistrano..."
+    Post.new(gems).post
   end
 
+ 
+  class Post
+ 
+    attr_reader :gems
+
+    include HTTParty
+    base_uri 'webistrano.local' # sorry hardcoded yet
+ 
+    def initialize(gems)
+      @gems = gems
+    end
+ 
+    def post
+      puts options.inspect
+      self.class.post('/projects/1/stages/1/dependencies', :query => options) # again hard coded
+    end
+ 
+    def dependencies
+      gems.map(&:to_hash)
+    end
+ 
+    def options
+      { :dependencies => dependencies }
+    end
+ 
+  end
+ 
   module Helper
 
     def file(*segments)
@@ -50,12 +81,12 @@ module Deproll
     end
 
     def to_hash
-      { :name               => name,
-        :current_version    => version,
-        :available_version  => latest_version,
-        :source             => source,
-        :lib                => lib,
-        :requirement        => requirement }
+      { :name               => name.to_s,
+        :current_version    => version.to_s,
+        :available_version  => latest_version.to_s,
+        :source             => source.to_s,
+        :lib                => lib.to_s,
+        :requirement        => requirement.to_s }
     end
 
     def requirement
