@@ -8,27 +8,60 @@ module Deproll
 
   def self.scan(dir)
     $deproll_dir = dir
-    puts Project.updateable_gems
+    puts Project.new.updateable_gems
+  end
+
+  module Helper
+
+    def file(*segments)
+      File.join(*[$deproll_dir] << segments)
+    end
+
   end
 
 
   class InstalledGem
-    attr_accessor :name, :version, :dependencies
+
+    attr_accessor :gemspec
 
     def initialize(gemspec)
-      gemspec = gemspec.last
-      @name = gemspec.name
-      @version = gemspec.version
-      @dependencies = gemspec.requirements.collect(&:first) #returns the name of a gem, e.g. 'fastthread' for Passenger
+      @gemspec = gemspec.last
     end
+
+    def dependencies
+      requirements.collect(&:first) #returns the name of a gem, e.g. 'fastthread' for Passenger
+    end
+
+    def method_missing(method, *args, &block)
+      if gemspec.respond_to?(method)
+        gemspec.send(method, *args, &block)
+      else
+        super
+      end
+    end
+
   end
 
   class ProjectGem
-    attr_reader :name, :source, :lib, :latest_version, :version
+
+    include Helper
+
+    attr_reader  :version
+
     def initialize(gemspec)
-      @name = gemspec.name
-      @source = gemspec.source
-      @lib = gemspec.lib
+      @gemspec = gemspec
+    end
+
+    def name
+      gemspec.name
+    end
+
+    def source
+      gemspec.source
+    end
+
+    def lib
+      gemspec.lib
     end
 
     def updateable?
@@ -36,19 +69,28 @@ module Deproll
       latest_version > vendored_version
     end
 
-    def vendored_version
-      @version = (installed? ? installed_version : '0')
-    end
-
     def to_s
       if installed?
-        "#{name} is #{version}, can be updated to #{latest_version}"
+        "#{name} is #{version}, can be updated to #{latest_version} from #{source}"
       else
-        "#{name} is not yet installed. Version #{latest_version} is available."
+        "#{name} is not yet installed. Version #{latest_version} is available on #{source}"
       end
     end
 
+    def version
+      case
+        when vendored? then vendored_version
+        when installed? then installed_version
+        else
+          '0'
+        end
+    end
+
     private
+
+    def vendored_version
+      @version = (installed? ? installed_version : '0')
+    end
 
     def dependency
       @dependency ||= Gem::Dependency.new(name, "> #{vendored_version}")
@@ -67,16 +109,28 @@ module Deproll
     end
 
     def installed?
-      vendored_gem.empty? ? false : true
     end
 
     def installed_version
-      @version = vendored_gem.first.split('-').last
+    end
+
+
+    def vendored?
+      vendored_gem.empty? ? false : true
+    end
+
+    def vendored_version
+      vendored_gem.first.split('-').last
     end
 
     def vendored_gem
-      @vendored_gem ||= Dir.new('./vendor/gems').entries.select{|gem| gem =~ /#{name}/}
+      @vendored_gem ||= Dir.glob(vendor_directory).select{|gem| gem =~ /\A#{name}-\w+\Z/}
     end
+
+    def vendor_directory
+      file("vendor", "gems")
+    end
+
   end
 
   class System
@@ -87,27 +141,41 @@ module Deproll
     end
   end
 
-  class Project
+  class RailsEnvironment
 
-    def self.read_rakefile
-      file = File.join($deproll_dir, "Rakefile")
-      eval(File.read(file)) if File.exist?(file)
+    include Helper
+
+    def rails?
+      File.exist?(file("config", "environment.rb"))
     end
 
-    def self.gems
-      read_rakefile
+    def rakefile
+      file("Rakefile")
+    end
+
+    def rakefile?
+      File.exist?(rakefile)
+    end
+
+    def load_rails
+      puts "Loading Rails..."
+      eval(File.read(rakefile))
       $gems_rake_task = true
       require 'rubygems/gem_runner'
       Rake::Task[:environment].invoke
-      Rails.configuration.gems.collect{|gemspec| ProjectGem.new(gemspec)}.flatten
     end
 
-    def self.updateable_gems
+    def gems
+      gemspecs.map { |gemspec| ProjectGem.new(gemspec) }.flatten
+    end
+
+    def gemspecs
+      Rails.configuration.gems
+    end
+
+    def updateable_gems
+      load_rails if rails?
       gems.select(&:updateable?)
-    end
-
-    def self.marshalled_gems
-      Marshal.dump(gems)
     end
 
   end
