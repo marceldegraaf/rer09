@@ -163,8 +163,14 @@ module Deproll
       gemspecs.map { |gemspec| ProjectGem.new(gemspec) }.flatten
     end
 
+    def dependencies(gem)
+      ([gem] + gem.dependencies.map { |dp| dependencies(dp) }.flatten).flatten
+    end
+
     def gemspecs
-      Rails.configuration.gems
+      Rails.configuration.gems.map do |gem|
+        [gem] + dependencies(gem)
+      end.flatten.uniq
     end
 
     def updateable_gems
