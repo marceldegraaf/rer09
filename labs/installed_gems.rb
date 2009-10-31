@@ -19,10 +19,9 @@ class InstalledGem
 end
 
 class ProjectGem
-  attr_reader :name, :requirements, :source, :lib, :latest_version, :version
+  attr_reader :name, :source, :lib, :latest_version, :version
   def initialize(gemspec)
     @name = gemspec.name
-    @requirements = gemspec.requirement.requirements.collect(&:to_s)
     @source = gemspec.source
     @lib = gemspec.lib
   end
@@ -33,11 +32,15 @@ class ProjectGem
   end
 
   def vendored_version
-    @version ||= Dir.new('./vendor/gems').entries.select{|gem| gem =~ /#{name}/}.first.split('-').last
+    @version = (installed? ? installed_version : '0')
   end
 
   def to_s
-    "#{name} is #{version}, can be updated to #{latest_version}"
+    if installed?
+      "#{name} is #{version}, can be updated to #{latest_version}"
+    else
+      "#{name} is not yet installed. Version #{latest_version} is available."
+    end
   end
 
   private
@@ -56,6 +59,18 @@ class ProjectGem
 
     def latest_version
       @latest_version = available_versions.last
+    end
+
+    def installed?
+      vendored_gem.empty? ? false : true
+    end
+
+    def installed_version
+      @version = vendored_gem.first.split('-').last
+    end
+
+    def vendored_gem
+      @vendored_gem ||= Dir.new('./vendor/gems').entries.select{|gem| gem =~ /#{name}/}
     end
 end
 
