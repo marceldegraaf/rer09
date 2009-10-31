@@ -1,8 +1,6 @@
 require 'rubygems'
 require 'rubygems/command'
 require 'rubygems/commands/update_command'
-# require File.dirname(__FILE__) + '/deproll/installed_gems'
-# require File.dirname(__FILE__) + '/deproll/rails'
 
 module Deproll
 
@@ -18,7 +16,6 @@ module Deproll
     end
 
   end
-
 
   class InstalledGem
 
