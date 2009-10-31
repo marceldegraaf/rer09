@@ -8,7 +8,7 @@ module Deproll
 
   def self.scan(dir)
     $deproll_dir = dir
-    puts Project.new.updateable_gems
+    puts RailsEnvironment.new.updateable_gems
   end
 
   module Helper
@@ -46,7 +46,7 @@ module Deproll
 
     include Helper
 
-    attr_reader  :version
+    attr_reader  :version, :gemspec
 
     def initialize(gemspec)
       @gemspec = gemspec
@@ -57,7 +57,7 @@ module Deproll
     end
 
     def source
-      gemspec.source
+      gemspec.source || Gem.sources.first
     end
 
     def lib
@@ -66,12 +66,13 @@ module Deproll
 
     def updateable?
       return false if available_versions.empty?
-      latest_version > vendored_version
+      latest_version > version
     end
 
     def to_s
-      if installed?
-        "#{name} is #{version}, can be updated to #{latest_version} from #{source}"
+      case
+        when vendored? then  "#{name} is #{version} (vendored), can be updated to #{latest_version} from #{source}"
+        when installed? then "#{name} is #{version} (installed), can be updated to #{latest_version} from #{source}"
       else
         "#{name} is not yet installed. Version #{latest_version} is available on #{source}"
       end
@@ -88,12 +89,8 @@ module Deproll
 
     private
 
-    def vendored_version
-      @version = (installed? ? installed_version : '0')
-    end
-
     def dependency
-      @dependency ||= Gem::Dependency.new(name, "> #{vendored_version}")
+      @dependency ||= Gem::Dependency.new(name, "> #{version}")
     end
 
     def fetcher
@@ -109,14 +106,15 @@ module Deproll
     end
 
     def installed?
+      installed_versions.any?
     end
 
     def installed_version
+      installed_versions.last.last.version.version
     end
 
-
     def vendored?
-      vendored_gem.empty? ? false : true
+      !vendored_gem.empty?
     end
 
     def vendored_version
@@ -124,21 +122,17 @@ module Deproll
     end
 
     def vendored_gem
-      @vendored_gem ||= Dir.glob(vendor_directory).select{|gem| gem =~ /\A#{name}-\w+\Z/}
+      @vendored_gem ||= Dir.new(vendor_directory).entries.select{|gem| gem =~ /\A#{name}-[\w|.]+\z/}
     end
 
     def vendor_directory
       file("vendor", "gems")
     end
 
-  end
-
-  class System
-    def self.gems
-      Gem.source_index.collect do |gemspec|
-        InstalledGem.new(gemspec)
-      end
+    def installed_versions
+      @installed_gems ||= Gem.source_index.select{|gem| gem.last.name == name}
     end
+
   end
 
   class RailsEnvironment
